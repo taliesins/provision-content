@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+###
+#  Simple example-integration script which calls 'gohai' to
+#  get inventory information, and post it to a (mythical) 
+#  Service URL.  This provides a simple demonstration of a 
+#  "stage" integration with Digital Rebar Provision. 
+###
+
+function usage() {
+	cat <<ENDUSAGE
+  Usage: $0 -k api-key -s service_url -i ident
+
+  Where:  -k api-key      is a token or key with permission to
+                          post to the (mythical) service_url
+          -s service_url  URI of the (mythical) service, eg:
+                          https://1.2.3.4:9999/api/v1/inventory/create
+
+          -i ident        the UUID of the Machine the collection
+                          ran on for identification purpose
+
+  Return Codes:
+          0               success
+          1               failed
+          2               usage error
+ENDUSAGE
+} # end usage()
+
+function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { XIT=$1; shift; } || XIT=255; echo "FATAL: $*"; exit $XIT; }
+
+while getopts ":k:s:i:hu" opt
+do
+    case "${opt}" in
+        h|u)  usage; exit 0;;
+        k)  API_KEY=$OPTARG;;
+        s)  SERVICE_URL=$OPTARG;;
+        i)  IDENT=$OPTARG;;
+        \?) echo
+            echo "Invalid Option: $OPTARG"
+            usage
+            exit 2
+            ;;
+
+    esac
+done
+
+[[ -z "$API_KEY" ]] && xiterr 1 "'-k API_KEY' not provided"
+[[ -z "$SERVER_URL" ]] && xiterr 1 "'-s SERVER_URL' not provided"
+[[ -z "$IDENT" ]] && xiterr 1 "'-i IDENT' not provided"
+
+
+HOST=`hostname`
+DATE=`date`
+JSON=`gohai | sed "s/^{/{\n  \"hostname\": \"${HOST}\",\n  \"RS_UUID\": \"{{.Machine.UUID}}\",\n  \"machine_id\": \"${IDENT}\",\n  \"collect_date\": \"$DATE\",/g"`
+
+set -x
+curl --silent --insecure --request POST          \
+     --header "Content-Type: application/json"   \
+     --header "Accept: application/json"         \
+     --header "Authorization: ${API_KEY}"        \
+     --data "${JSON}"                            \
+     "${SERVICE_URL}";
+X=$?
+set +x
+
+exit $X

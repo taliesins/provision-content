@@ -1,0 +1,13 @@
+---
+Name: "example/id"
+Description: "ID for reference of this machine to send to Service"
+Documentation: |
+  This string identifies this node to the Service.
+
+Schema:
+  type: "string"
+
+Meta:
+  icon: "user"
+  color: "blue"
+  title: "RackN Content"

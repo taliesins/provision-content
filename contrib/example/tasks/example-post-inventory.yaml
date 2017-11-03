@@ -1,0 +1,30 @@
+---
+Description: "A task to collect and send gohai inventory to Service for Machine."
+Name: "example-post-inventory"
+RequiredParams:
+  - "example/api-key"
+  - "example/service-url"
+  - "example/id"
+Templates:
+  - ID: "example.sh.tmpl"
+    Name: "Script which collects 'gohai' inventory and send to Service"
+    Path: "/tmp/example.sh"
+  - ID: "ensure-curl.sh.tmpl"
+    Name: "Ensure 'curl' is installed"
+  - Name: "Run example-post-inventory task."
+    Contents: |
+      #!/usr/bin/env bash
+      
+      bash /tmp/example.sh -k {{.Param "example/api-key"}} -s {{.Param "example/server-url"}} -i {{.Param "example/id"}}
+      if [[ $? -ne 0 ]] ; then
+          echo "FAILED to complete example-integration stage"
+          exit 4
+      fi
+
+      echo "Successfully completed example-integration stage"
+      rm -f /tmp/example.sh
+      exit 0
+Meta:
+  icon: "announcement"
+  color: "blue"
+  title: "RackN Content"

@@ -1,0 +1,11 @@
+---
+Description: "Stage to collect inventory and post to Service"
+Name: "example-stage"
+RunnerWait: true
+Tasks:
+  - "example-post-inventory"
+  - "change-stage"
+Meta:
+  icon: "announcement"
+  color: "yellow"
+  title: "RackN Content"

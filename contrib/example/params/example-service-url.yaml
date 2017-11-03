@@ -1,0 +1,14 @@
+---
+Name: "example/service-url"
+Description: "Service URL to send inventory to"
+Documentation: |
+  This string defines the URL of the Service to send the inventory information to.
+
+Schema:
+  type: "string"
+
+Meta:
+  icon: "privacy"
+  color: "blue"
+  title: "RackN Content"
+  password: "hideme"

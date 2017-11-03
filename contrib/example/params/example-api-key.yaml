@@ -1,0 +1,13 @@
+---
+Name: "example/api-key"
+Description: "The API Key for authentication"
+Documentation: |
+  This string defines API Key for example-integration.
+
+Schema:
+  type: "string"
+
+Meta:
+  icon: "privacy"
+  color: "blue"
+  title: "RackN Content"
