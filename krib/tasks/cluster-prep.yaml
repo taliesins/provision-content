@@ -1,0 +1,30 @@
+---
+Description: "KRIB prep tasks (leader election, packet bgp support)"
+Name: "krib-prep"
+Documentation: |
+  Preps a KRIB cluster.  If in packet.net envioronment, we will setup the
+  appropriate sidecar for BGP announcements for the Virtual IP assignment.
+  We also pre-elect leaders if the 'cluster/profile' Param is set.  This is
+  required for the BGP Annoucements support.
+
+  If 'cluster/profile' is not set, standard election patterns will be used.
+
+OptionalParams:
+  - krib/packet-bgp-announce-password
+  - cluster/profile
+  - cluster/leader-count
+Templates:
+  - ID: "packet-bgp-manage.sh"
+    Name: "Packet BGP Manage Tool"
+    Path: "/tmp/packet-bgp-manage.sh"
+  - ID: "packet-bgp-vip.sh.tmpl"
+    Name: "KRIB Packet BGP Virtual IP Tool"
+    Path: "/tmp/packet-bgp-vip.sh"
+  - ID: "cluster-prep.sh.tmpl"
+    Name: "Cluster Prep Steps"
+    Path: ""
+Meta:
+  icon: "ship"
+  color: "blue"
+  title: "Community Content"
+  feature-flags: "sane-exit-codes"

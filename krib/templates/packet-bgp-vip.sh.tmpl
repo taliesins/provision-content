@@ -1,0 +1,74 @@
+#!/bin/bash
+# Set up BGP Announcements sidecar for Packet.net based Virtual IP
+
+###
+#  Must be run AFTER docker install completes - we need to inject a
+#  Docker "sidecar" with the BGP Announce agent.
+#
+#  This template is intended to be run from the 'cluster-prep' task, only
+#  on an elected Leader of the cluster.  We do not determine Leader
+#  status, that should be completed by the 'cluster-prep' task.
+###
+
+function xiterr() { [[ $1 =~ ^[0-9]+$ ]] && { XIT=$1; shift; } || XIT=1; printf "FATAL: $*\n"; exit $XIT; }
+
+set -e
+{{ template "setup.tmpl" }}
+
+DOCKER=$(which docker)
+[[ -z "$DOCKER" || ! -x "$DOCKER" ]] && xiterr 1 "Docker binary not found or executable."
+
+$DOCKER info > /dev/null 2>&1 && echo "Docker is running..." || xiterr 1 "Docker is not running yet."
+
+{{ if .ParamExists "krib/packet-bgp-announce-password" -}}
+BGP_PW={{ .Param "krib/packet-bgp-announce-password" }}
+{{ else -}}
+echo "'krib/packet-bgp-announce-password' not set - attempting to retrieve via API"
+PKT_URL="https://api.packet.net"
+# if not already set, try and get Packet API and Project keys
+[[ -z "$PKT_API_KEY" ]] && PKT_API_KEY=$(drpcli plugins get packet-ipmi param packet/api-key | jq -r '.')
+[[ -z "$PKT_PROJECT" ]] && PKT_PROJECT=$(drpcli plugins get packet-ipmi param packet/project-id | jq -r '.')
+[[ -z "$PKT_API_KEY" ]] && xiterr 1 "couldn't get API Key from Plugin 'packet-ipmi'"
+[[ -z "$PKT_PROJECT" ]] && xiterr 1 "couldn't get Key from Plugin 'packet-ipmi'"
+
+BGP_PW=$(                                         \
+  curl --silent --request GET                     \
+    --header "Content-Type: application/json"     \
+    --header "Accept: application/json"           \
+    --header "X-Auth-Token: ${PKT_API_KEY}"       \
+    ${PKT_URL}/projects/${PKT_PROJECT}/bgp-config \
+    | jq -r '.md5'
+)
+
+[[ -z "$BGP_PW" ]] && xiterr 1 "Required param 'krib/packet-bgp-announce-password' not set,\nand unable to obtain it from the API automatically."
+{{ end -}}
+
+# check for BGP_ANNOUNCE in metadata (userdata section)
+ANNOUNCE=$(curl -s https://metadata.packet.net/metadata | jq -r '.customdata.BGP_ANNOUNCE')
+[[ -z "$ANNOUNCE" ]] && xiterr 1 "BGP_ANNOUNCE not found in Packet metadata"
+
+# pull the packet-bgp-agent sidecar container - we need to paramertize
+# location, container name, and version ... later ...
+REGISTRY="quay.io/opencopilot"
+NAME="packet-bgp-agent"
+VERSION="latest"
+CONTAINER=${REGISTRY}/${NAME}:${VERSION}
+$DOCKER pull $CONTAINER
+CID=$(docker images | grep ${REGISTRY}/${NAME} | awk ' { print $3 } ')
+
+[[ -z "$CID" ]] && xiterr 1 "failed to get Image ID for container '${CONTAINER}' after 'pull'"
+
+# get the container ID
+
+$DOCKER run --detach --privileged --env MD5_PASSWORD=${BGP_PW} --net host ${CID}
+
+echo "Running BGP Agent container information:"
+$DOCKER ps | egrep "COMMAND|packet-bgp-agent"
+
+###
+#  Now we need to set the Machine ID to enable BGP announcement handling
+#  on the packet.net API side... Our 'krib-prep' task should prestage the
+#  packet-bgp.sh script that activates
+###
+
+exit 0

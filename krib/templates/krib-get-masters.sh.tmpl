@@ -21,6 +21,11 @@ exit 1
 
 {{template "krib-lib.sh.tmpl" .}}
 
+###
+#  run our standard election pattern - since we don't have a set of
+#  pre-elected leaders from cluster/leaders
+###
+function standard_election() {
 MASTER_ON_ETCDS={{.Param "krib/cluster-masters-on-etcds"}}
 ETCD_COUNT={{.Param "etcd/server-count"}}
 
@@ -61,16 +66,49 @@ else
   fi
 fi
 
-echo "Electing Members to $CLUSTER_PROFILE"
-MASTER_INDEX=$(add_me_if_not_count "$KRIB_MASTERS_PARAM" $KRIB_MASTER_COUNT)
-if [[ $MASTER_INDEX == notme ]] ; then
-  echo "I am not a master server.  Move on."
+  _add_me
 
-  # Set machine icon and color for KRIB cluster building
-  drpcli machines update $RS_UUID "{\"Meta\":{\"color\":\"yellow\", \"icon\": \"ship\"} }" | jq .Meta
+} # end standard_election()
 
-  exit 0
-fi
+function _add_me() {
+  echo "Electing Members to $CLUSTER_PROFILE"
+  MASTER_INDEX=$(add_me_if_not_count "$KRIB_MASTERS_PARAM" $KRIB_MASTER_COUNT)
+  if [[ $MASTER_INDEX == notme ]] ; then
+    echo "I am not a master server.  Move on."
+
+    # Set machine icon and color for KRIB cluster building
+    drpcli machines update $RS_UUID "{\"Meta\":{\"color\":\"yellow\", \"icon\": \"ship\"} }" | jq .Meta
+
+    exit 0
+  fi
+} # end _add_me()
+
+###
+#  use the pre-elected master(s) from Multi-Master Cluster Pattern
+#  tooling if it exists already - otherwise, fall back to our
+#  stnadard_elections method... 
+###
+{{ if .ParamExists "cluster/profile" -}}
+  {{ if .ParamExists "cluster/leaders" -}}
+    {{ if .ParamExists "krib/cluster-masters" -}}
+      echo "KRIB masters set in 'krib/cluster-masters', not using 'cluster/leaders' as KRIB masters"
+    {{ else -}}
+      {{ range $leader := .Param "cluster/leaders" -}}
+        ME={{.Machine.Uuid}}
+        if [[ "$ME" == "{{ $leader }}" ]]; then
+          _add_me
+        fi
+      {{ end -}}
+      {{ end -}}
+  {{ else -}}
+    echo "FATAL:  'cluster/profile' defined, but no 'cluster/leaders' found."
+    echo "        HINT:  did you run 'cluster-add' Stage prior to this?"
+    exit 1
+  {{ end -}}
+{{ else -}}
+  echo "Not using 'cluster/leaders', running a standard election now..."
+  standard_election
+{{ end -}}
 
 if (( $KRIB_MASTER_COUNT > 1 )) ; then
   {{if .ParamExists "krib/cluster-master-vip" -}}
@@ -82,7 +120,7 @@ if (( $KRIB_MASTER_COUNT > 1 )) ; then
 
   drpcli machines tasks add {{.Machine.UUID}} at 0 krib-keepalived krib-haproxy
 else
-  # If we are single machine, don't setup VIP.
+  # Check If we are single master cluster, don't setup VIP.
   {{if .ParamExists "krib/cluster-master-vip" -}}
     drpcli -T "$PROFILE_TOKEN" profiles set "$CLUSTER_PROFILE" param "$KRIB_MASTER_VIP_PARAM" to {{.Machine.Address}} || true
   {{else -}}

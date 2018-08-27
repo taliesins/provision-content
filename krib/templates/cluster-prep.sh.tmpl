@@ -1,0 +1,49 @@
+#!/bin/bash
+# Perform cluster pre-setup prior to ETCD/Kubernetes pieces.
+
+###
+#  This template relies
+#  (assuming 'krib' is the name of your profile):
+#
+#   cluster/profile: krib
+#   cluster/leader-count: 3
+###
+
+set -e
+{{ template "setup.tmpl" }}
+
+# check if we have cluster/profile set - exit otherwise
+{{ if .ParamExists "cluster/profile" -}}
+CLUSTER_PROFILE={{ .Param "cluster/profile" }}
+PROFILE_TOKEN={{.GenerateProfileToken (.Param "cluster/profile") 7200}}
+{{ else -}}
+echo "Param 'cluster/profile' not set.  Will use standard KRIB elections for ETCD and Kubernetes."
+exit 0
+{{ end -}}
+
+{{ range $leader := .Param "cluster/leaders" -}}
+  ME={{.Machine.Uuid}}
+
+  if [[ "$ME" == "{{ $leader }}" ]]
+  then
+    echo "I have been elected a leader.  Running pre-setup tasks."
+
+    # get our Packet credentials
+    export PKT_API_KEY=$(drpcli plugins get packet-ipmi param packet/api-key | jq -r '.')
+    export PKT_PROJECT=$(drpcli plugins get packet-ipmi param packet/project-id | jq -r '.')
+
+    # activate BGP announcements on this machine - two parts, install
+    # BGP agent sidecar container, and enable the Device UUID to allow
+    # BGP announcements - both of these scripts are (supposed to be...)
+    # staged for us via the cluster-prep task
+    VIP="/tmp/packet-bgp-vip.sh"
+    MNG="/tmp/packet-bgp-manage.sh"
+    [[ ! -x "$VIP" ]] xiterr 1 "'$VIP' script not executable or found"
+    [[ ! -x "$MNG" ]] xiterr 1 "'$MNG' script not executable or found"
+
+    $VIP
+    $MNG -4 -6 -s -t ${PKT_API_KEY} -m ${ME}
+  else
+    echo "I am not a pre-elected master - not running pre-setup templates."
+  fi
+{{ end -}}

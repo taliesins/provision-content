@@ -1,0 +1,29 @@
+---
+Description: "A task to elect N masters to a KRIB cluster."
+Name: "etcd-config"
+Documentation: |
+  This task utilizes the RackN Multi-machine Cluster Pattern:
+    https://provision.readthedocs.io/en/tip/doc/arch/cluster.html
+
+  It is intended to allow an operator to pre-elect cluster leaders
+  prior to ETCD or Kubernetes running.  It is often necessary to "prep"
+  a set of cluster masters prior to running ETCD or Kubernetes.
+
+  If the listed OptionalParams are not found on the Machine, then
+  no action is taken.  If the 'cluster/profile' Param is found,
+  then a cluster elections will occur and the 'etc/servers' and 
+  'krib/cluster-masters' Params will be set appropriately.
+
+OptionalParams:
+  - cluster/leaders
+  - cluster/profile
+  - cluster/leader-count
+Templates:
+  - ID: "cluster-election.sh.tmpl"
+    Name: "Cluster Election"
+    Path: ""
+Meta:
+  icon: "book"
+  color: "blue"
+  title: "Community Content"
+  feature-flags: "sane-exit-codes"

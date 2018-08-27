@@ -46,6 +46,32 @@ drpcli -T "$PROFILE_TOKEN" profiles add "$CLUSTER_PROFILE" param "etcd/servers-d
 ETCD_SERVER_COUNT={{.Param "etcd/server-count"}}
 echo "Creating $ETCD_SERVER_COUNT servers"
 
+# use the pre-elected master from Multi-Master Cluster Pattern
+# tooling if it exists already - otherwise, fall back to our
+# own election... this assumes that 'cluster/leader-count' matches
+# desired 'etcd/server-count' without any safety checks
+{{ if .ParamExists "cluster/profile" -}}
+  {{ if .ParamExists "cluster/leaders" -}}
+
+    {{ if .ParamExists "etcd/servers" -}}
+      echo "ETCD leaders already set in 'etcd/servers', not using cluster/leaders as ETCD servers"
+    {{ else -}}
+      {{ range $leader := .Param "cluster/leaders" -}}
+        ME={{.Machine.Uuid}}
+        if [[ "$ME" == "{{ $leader }}" ]]; then
+          add_me_if_not_count "etcd/servers" $ETCD_SERVER_COUNT
+        else
+          echo "I'm not an elected leader ... not adding to 'etcd/servers'."
+        fi
+      {{ end -}}
+
+      {{ end -}}
+  {{ else -}}
+    echo "FATAL:  'cluster/profile' defined, but no 'cluster/leaders' found."
+    echo "        HINT:  did you run 'cluster-add' Stage prior to this?"
+    exit 1
+  {{ end -}}
+{{ else -}}
 echo "Electing etcd members to cluster profile: $CLUSTER_PROFILE"
 ETCD_INDEX=$(add_me_if_not_count "etcd/servers" $ETCD_SERVER_COUNT)
 if [[ $ETCD_INDEX == notme ]] ; then
@@ -53,6 +79,7 @@ if [[ $ETCD_INDEX == notme ]] ; then
   wait_for_count "etcd/servers-done" $ETCD_SERVER_COUNT
   exit 0
 fi
+{{ end -}}
 
 CLIENT_CA=${ETCD_CLUSTER_NAME}-client-ca
 SERVER_CA=${ETCD_CLUSTER_NAME}-server-ca
