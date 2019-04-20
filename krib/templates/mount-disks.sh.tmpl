@@ -47,7 +47,7 @@ w
 " | fdisk /dev/$GETDISK || true
 
 partprobe
-
+partx -u /dev/${GETDISK}
 
 echo "Make filesystem - xfs - docker likes it"
 
