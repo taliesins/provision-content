@@ -33,7 +33,7 @@ else
     echo "/dev/sda1 is not mounted"
 fi
 
-GETDISK=$(lsblk | grep "disk" | awk '{ print $1 }' | head -1)
+GETDISK=$(lsblk | grep "disk" | awk '{ print $1 }' | grep -v "fd*" | head -1)
 echo "Found /dev/$GETDISK - using ..."
 
 echo "Making partitions"
@@ -47,6 +47,7 @@ w
 " | fdisk /dev/$GETDISK || true
 
 partprobe
+
 
 echo "Make filesystem - xfs - docker likes it"
 
